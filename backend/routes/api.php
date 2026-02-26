@@ -19,12 +19,19 @@ Route::middleware('auth:sanctum')->group(function () {
         return response()->json($request->user()->load('roles'));
     });
 
-    // RBAC: Only Super Admins can create Clinic Admins
+    // ==========================================
+    // SUPER ADMIN ONLY ROUTES
+    // ==========================================
     Route::middleware('role:super_admin')->group(function () {
-        Route::post('/users/clinic-admin', [UserController::class, 'createClinicAdmin']);
+        // ⚠️ CRITICAL: Custom routes MUST go before apiResource!
+        Route::post('/clinics/provision', [ClinicController::class, 'provision']);
+        Route::post('/clinics/{clinic}/impersonate', [ClinicController::class, 'impersonate']);
     });
 
-    // Standard Resources
+    // ==========================================
+    // STANDARD RESOURCES
+    // ==========================================
+    // These must stay at the bottom of the group!
     Route::apiResource('clinics', ClinicController::class);
     Route::apiResource('patients', PatientController::class);
 });

@@ -4,49 +4,38 @@ namespace App\Http\Controllers;
 
 use App\Models\Clinic;
 use App\Models\User;
+use Carbon\Carbon; // <-- IF THIS WAS MISSING, IT CAUSES THE 500 ERROR
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log; // <-- Required for error logging
 
 class ClinicController extends Controller
 {
-    /**
-     * Display a listing of all clinics (for Super Admin dashboard)
-     */
     public function index()
     {
-        // Return main clinics with their branches
         $clinics = Clinic::whereNull('parent_clinic_id')->with('branches')->get();
         return response()->json($clinics);
     }
 
-    /**
-     * Enterprise Provisioning: Creates Clinic, Admin User, and optional Branch in one Transaction.
-     */
     public function provision(Request $request)
     {
-        // 1. Validate the massive payload
+        // 1. Validation
         $request->validate([
             'name' => 'required|string|max:255',
             'phone' => 'required|string|max:20',
             'address' => 'required|string',
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048', // 2MB max
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
             
-            // User validations
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6|confirmed', // Must match password_confirmation
+            'password' => 'required|string|min:6|confirmed',
             
-            // Subscription validations
-            'max_branches' => 'required|integer|min:0',
             'expiry_date' => 'required|date',
-            'first_warning_date' => 'required|date',
-            'second_warning_date' => 'required|date',
+            'max_branches' => 'nullable|integer|min:0',
             
-            // Contacts Array (Sent as JSON string from React FormData)
             'clinic_contacts' => 'required|string', 
             
-            // Branch validation (conditional)
             'has_branch' => 'required|in:true,false,1,0',
             'branch_name' => 'required_if:has_branch,true',
             'branch_address_1' => 'required_if:has_branch,true',
@@ -55,53 +44,50 @@ class ClinicController extends Controller
             'branch_zip' => 'required_if:has_branch,true',
         ]);
 
-        // Start Database Transaction
         DB::beginTransaction();
 
         try {
-            // 2. Handle File Upload (Logo)
             $logoPath = null;
             if ($request->hasFile('logo')) {
-                // Stores in storage/app/public/clinics/logos
                 $logoPath = $request->file('logo')->store('clinics/logos', 'public');
             }
 
-            // 3. Decode the JSON contacts sent from React
-            $clinicContacts = json_decode($request->clinic_contacts, true);
+            // SAFE DECODE
+            $clinicContacts = json_decode($request->clinic_contacts, true) ?? [];
 
-            // 4. Create the Master Tenant (Clinic)
+            // AUTOMATIC DATE CALCULATIONS
+            $expiryDate = Carbon::parse($request->expiry_date);
+            $firstWarning = $expiryDate->copy()->subMonths(3);
+            $secondWarning = $expiryDate->copy()->subWeeks(1);
+
+            // Create Master Clinic
             $clinic = Clinic::create([
                 'name' => $request->name,
-                'email' => $request->email, // Primary contact email
+                'email' => $request->email,
                 'phone' => $request->phone,
                 'address' => $request->address,
                 'logo_path' => $logoPath,
-                'max_branches' => $request->max_branches,
-                'expiry_date' => $request->expiry_date,
-                'first_warning_date' => $request->first_warning_date,
-                'second_warning_date' => $request->second_warning_date,
-                'contacts' => $clinicContacts, // Requires JSON casting in Clinic Model
+                'max_branches' => $request->max_branches ?? 0,
+                'expiry_date' => $expiryDate,
+                'first_warning_date' => $firstWarning,
+                'second_warning_date' => $secondWarning,
+                'contacts' => $clinicContacts,
                 'is_active' => true,
             ]);
 
-            // 5. Create the default Clinic Admin User
+            // Create Clinic Admin
             $adminUser = User::create([
                 'name' => 'Admin - ' . $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'clinic_id' => $clinic->id,
             ]);
-            
-            // Assign Spatie Role
             $adminUser->assignRole('clinic_admin');
 
-            // 6. Conditionally Create the Branch Clinic
+            // Create Branch if requested
             $hasBranch = filter_var($request->has_branch, FILTER_VALIDATE_BOOLEAN);
-            
             if ($hasBranch) {
-                $branchContacts = json_decode($request->branch_contacts, true);
-                
-                // Format the full address from the separate fields
+                $branchContacts = json_decode($request->branch_contacts, true) ?? [];
                 $fullBranchAddress = sprintf(
                     "%s %s, %s, %s %s", 
                     $request->branch_address_1, 
@@ -114,16 +100,15 @@ class ClinicController extends Controller
                 Clinic::create([
                     'name' => $request->branch_name,
                     'email' => $request->email, 
-                    'phone' => $branchContacts[0]['phone'] ?? $request->phone, // Use first contact's phone or fallback
+                    'phone' => $branchContacts[0]['phone'] ?? $request->phone,
                     'address' => trim($fullBranchAddress),
-                    'parent_clinic_id' => $clinic->id, // Link to master clinic
-                    'logo_path' => $logoPath, // Inherit logo
+                    'parent_clinic_id' => $clinic->id,
+                    'logo_path' => $logoPath,
                     'contacts' => $branchContacts,
                     'is_active' => true,
                 ]);
             }
 
-            // If everything succeeded, commit the data to the DB
             DB::commit();
 
             return response()->json([
@@ -132,44 +117,33 @@ class ClinicController extends Controller
             ], 201);
 
         } catch (\Exception $e) {
-            // If anything fails (like a DB error), rollback so we don't have broken data
             DB::rollBack();
-            
-            // Delete the uploaded logo if DB creation failed to save disk space
             if (isset($logoPath)) Storage::disk('public')->delete($logoPath);
 
+            Log::error('Clinic Provisioning Failed: ' . $e->getMessage());
+
             return response()->json([
-                'message' => 'Provisioning Failed due to Server Error',
-                'error' => $e->getMessage()
+                'message' => 'Provisioning Failed: ' . $e->getMessage()
             ], 500);
         }
     }
 
-    /**
-     * Impersonation feature: Super Admin logs in as the Clinic Admin without a password.
-     */
     public function impersonate($id)
     {
-        // Ensure only Super Admins can do this
         if (!auth()->user()->hasRole('super_admin')) {
-            return response()->json(['message' => 'Unauthorized. Super Admin access required.'], 403);
+            return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
-        // Find the specific clinic
         $clinic = Clinic::findOrFail($id);
-
-        // Find the primary administrator user for this specific clinic
         $clinicAdmin = User::where('clinic_id', $clinic->id)->role('clinic_admin')->first();
 
         if (!$clinicAdmin) {
-            return response()->json(['message' => 'This clinic does not have an active administrator account.'], 404);
+            return response()->json(['message' => 'No admin found.'], 404);
         }
 
-        // Generate a new temporary Sanctum token for the Clinic Admin
-        $token = $clinicAdmin->createToken('impersonation_token')->plainTextToken;
+        $token = $clinicAdmin->createToken('impersonation')->plainTextToken;
 
         return response()->json([
-            'message' => 'Impersonation successful',
             'access_token' => $token,
             'user' => $clinicAdmin->load('roles', 'clinic')
         ]);

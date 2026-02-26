@@ -20,7 +20,7 @@ export default function ClinicManagement() {
     // Initial State Template for Contacts
     const emptyContact = { phone: '', name: '', position: '' };
 
-    // Complex Form State
+    // Complex Form State (Removed manual warning dates)
     const [formData, setFormData] = useState({
         // Clinic Profile
         name: '', 
@@ -32,7 +32,8 @@ export default function ClinicManagement() {
         email: '', password: '', password_confirmation: '',
         
         // Subscription
-        max_branches: 0, expiry_date: '', first_warning_date: '', second_warning_date: '',
+        max_branches: 0, 
+        expiry_date: '',
         
         // Branch Creation
         has_branch: false,
@@ -96,17 +97,19 @@ export default function ClinicManagement() {
         e.preventDefault();
         const payload = new FormData();
         
-        // Append standard fields
+        // Ensure the first phone number in your contacts array is sent 
+        // as the primary 'phone' field the backend expects.
+        if (formData.clinic_contacts.length > 0) {
+            payload.append('phone', formData.clinic_contacts[0].phone);
+        }
+
         Object.keys(formData).forEach(key => {
-            if (key !== 'clinic_contacts' && key !== 'branch_contacts' && key !== 'logo') {
+            if (key !== 'clinic_contacts' && key !== 'branch_contacts' && key !== 'logo' && key !== 'phone') {
                 payload.append(key, formData[key]);
             }
         });
         
-        // Append Logo
         if(formData.logo) payload.append('logo', formData.logo);
-        
-        // Append Complex Arrays as JSON Strings (Laravel will decode these)
         payload.append('clinic_contacts', JSON.stringify(formData.clinic_contacts));
         if (formData.has_branch) {
             payload.append('branch_contacts', JSON.stringify(formData.branch_contacts));
@@ -118,10 +121,41 @@ export default function ClinicManagement() {
             });
             alert('Clinic Provisioned Successfully!');
             setIsModalOpen(false);
+            
+            // Reset Form Data
+            setFormData({
+                name: '', address: '', logo: null, clinic_contacts: [{ ...emptyContact }],
+                email: '', password: '', password_confirmation: '', max_branches: 0, expiry_date: '',
+                has_branch: false, branch_name: '', branch_address_1: '', branch_address_2: '',
+                branch_country: '', branch_state: '', branch_zip: '', branch_contacts: [{ ...emptyContact }]
+            });
+            
             fetchClinics();
         } catch (error) {
-            alert(error.response?.data?.message || 'Validation Error. Please check your inputs.');
+            // Detailed Validation Error Alerting
+            if (error.response?.status === 422) {
+                const errors = error.response.data.errors;
+                const firstErrorMsg = Object.values(errors)[0][0];
+                alert(`Validation Error: ${firstErrorMsg}`);
+            } else {
+                alert(error.response?.data?.message || 'Server Error. Please try again.');
+            }
         }
+    };
+
+    const handleImpersonate = async (clinicId) => {
+        if(!window.confirm("Log in as this clinic's administrator?")) return;
+        try {
+            const { data } = await axiosClient.post(`/api/clinics/${clinicId}/impersonate`);
+            localStorage.setItem('ACCESS_TOKEN', data.access_token);
+            window.location.href = '/dashboard'; 
+        } catch (e) {
+            alert("Impersonation failed. Ensure you have Super Admin privileges.");
+        }
+    };
+
+    const handleBulkUploadClick = () => {
+        alert("Please upload a CSV file with columns: Name, Phone, Email, DOB. Download the template first.");
     };
 
     if (authLoading) return <div className="flex items-center justify-center min-h-screen bg-slate-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600"></div></div>;
@@ -146,9 +180,67 @@ export default function ClinicManagement() {
                         </button>
                     </div>
 
-                    {/* Data Table Area (Kept identical to previous response for brevity) */}
-                    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-8 text-center text-slate-500">
-                        {clinics.length === 0 ? "No clinics provisioned yet." : `Showing ${clinics.length} clinics.`}
+                    {/* Data Table */}
+                    <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-8">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                                        <th className="p-4">Clinic Details</th>
+                                        <th className="p-4">Subscription Status</th>
+                                        <th className="p-4">Branches</th>
+                                        <th className="p-4 text-right">Administrative Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 text-sm">
+                                    {clinics.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="4" className="p-8 text-center text-slate-500">
+                                                No clinics provisioned yet. Click "Provision New Clinic" to begin.
+                                            </td>
+                                        </tr>
+                                    ) : clinics.map(clinic => (
+                                        <tr key={clinic.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="p-4">
+                                                <div className="flex items-center">
+                                                    <div className="w-10 h-10 rounded-lg bg-slate-200 flex items-center justify-center text-slate-500 font-bold mr-3 overflow-hidden border border-slate-200 shrink-0">
+                                                        {clinic.logo_path ? <img src={`http://127.0.0.1:8000/storage/${clinic.logo_path}`} className="w-full h-full object-cover" alt="logo" /> : clinic.name.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-semibold text-slate-800">{clinic.name}</p>
+                                                        <p className="text-slate-500 text-xs">{clinic.phone} • {clinic.email}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="p-4">
+                                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${clinic.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                    {clinic.is_active ? 'Active' : 'Suspended'}
+                                                </span>
+                                                <p className="text-xs text-slate-500 mt-1">Exp: {clinic.expiry_date || 'N/A'}</p>
+                                            </td>
+                                            <td className="p-4 text-slate-600">{clinic.max_branches} Allowed</td>
+                                            <td className="p-4">
+                                                <div className="flex items-center justify-end space-x-2">
+                                                    <button onClick={() => handleImpersonate(clinic.id)} className="px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded hover:bg-slate-800 transition-colors shadow-sm" title="Login as this clinic">
+                                                        Login As
+                                                    </button>
+                                                    <button onClick={handleBulkUploadClick} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded hover:bg-emerald-100 transition-colors shadow-sm">
+                                                        CSV Upload
+                                                    </button>
+                                                    <div className="h-4 w-px bg-slate-300 mx-1"></div>
+                                                    <button className="text-slate-400 hover:text-sky-600 transition-colors p-1" title="Edit Clinic">
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                                    </button>
+                                                    <button className="text-slate-400 hover:text-amber-600 transition-colors p-1" title="Reset Password">
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </main>
                 <Footer />
@@ -185,7 +277,7 @@ export default function ClinicManagement() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
                                     <div>
                                         <label className="block text-xs font-semibold text-slate-600 mb-1">Clinic Name</label>
-                                        <input type="text" required onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:border-sky-500 text-sm outline-none transition-all" />
+                                        <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:border-sky-500 text-sm outline-none transition-all" />
                                     </div>
                                     <div className="bg-slate-50 p-2 rounded-lg border border-dashed border-slate-300">
                                         <label className="block text-xs font-semibold text-slate-600 mb-1">Clinic Logo</label>
@@ -193,7 +285,7 @@ export default function ClinicManagement() {
                                     </div>
                                     <div className="md:col-span-2">
                                         <label className="block text-xs font-semibold text-slate-600 mb-1">HQ Address</label>
-                                        <textarea required onChange={e => setFormData({...formData, address: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:border-sky-500 text-sm outline-none transition-all"></textarea>
+                                        <textarea required value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:border-sky-500 text-sm outline-none transition-all"></textarea>
                                     </div>
                                 </div>
 
@@ -217,7 +309,6 @@ export default function ClinicManagement() {
                                             </div>
                                             <div className="flex-1 min-w-[150px]">
                                                 <label className="block text-[10px] uppercase text-slate-500 mb-1">Position / Role</label>
-                                                {/* list="position-options" connects to the <datalist> allowing typing OR dropdown selection */}
                                                 <input list="position-options" value={contact.position} onChange={e => handleContactChange('clinic', idx, 'position', e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Type or Select..." />
                                             </div>
                                             {formData.clinic_contacts.length > 1 && (
@@ -237,16 +328,16 @@ export default function ClinicManagement() {
                                     <div className="space-y-4">
                                         <div>
                                             <label className="block text-xs font-semibold text-slate-600 mb-1">Login Email ID</label>
-                                            <input type="email" required onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:border-sky-500 text-sm outline-none transition-all" />
+                                            <input type="email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:border-sky-500 text-sm outline-none transition-all" />
                                         </div>
                                         <div className="flex gap-3">
                                             <div className="flex-1">
                                                 <label className="block text-xs font-semibold text-slate-600 mb-1">Password</label>
-                                                <input type="password" required onChange={e => setFormData({...formData, password: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:border-sky-500 text-sm outline-none transition-all" />
+                                                <input type="password" required value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:border-sky-500 text-sm outline-none transition-all" />
                                             </div>
                                             <div className="flex-1">
                                                 <label className="block text-xs font-semibold text-slate-600 mb-1">Confirm</label>
-                                                <input type="password" required onChange={e => setFormData({...formData, password_confirmation: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:border-sky-500 text-sm outline-none transition-all" />
+                                                <input type="password" required value={formData.password_confirmation} onChange={e => setFormData({...formData, password_confirmation: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:border-sky-500 text-sm outline-none transition-all" />
                                             </div>
                                         </div>
                                     </div>
@@ -257,19 +348,17 @@ export default function ClinicManagement() {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-semibold text-slate-600 mb-1">Max Branches</label>
-                                            <input type="number" required min="0" onChange={e => setFormData({...formData, max_branches: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:border-sky-500 text-sm outline-none transition-all" />
+                                            <input type="number" min="0" value={formData.max_branches} onChange={e => setFormData({...formData, max_branches: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:border-sky-500 text-sm outline-none transition-all" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-semibold text-slate-600 mb-1">Expiry Date</label>
-                                            <input type="date" required onChange={e => setFormData({...formData, expiry_date: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:border-sky-500 text-sm outline-none transition-all" />
+                                            <label className="block text-xs font-semibold text-slate-600 mb-1">Expiry Date <span className="text-red-500">*</span></label>
+                                            <input type="date" required value={formData.expiry_date} onChange={e => setFormData({...formData, expiry_date: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:border-sky-500 text-sm outline-none transition-all" />
                                         </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-slate-600 mb-1">1st Warning Date</label>
-                                            <input type="date" required onChange={e => setFormData({...formData, first_warning_date: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:border-sky-500 text-sm outline-none transition-all" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-slate-600 mb-1">2nd Warning Date</label>
-                                            <input type="date" required onChange={e => setFormData({...formData, second_warning_date: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:border-sky-500 text-sm outline-none transition-all" />
+                                        <div className="col-span-2 bg-amber-50 p-3 rounded-lg border border-amber-200 mt-2 flex items-start">
+                                            <svg className="w-4 h-4 mr-2 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                            <p className="text-xs text-amber-700 font-medium">
+                                                Automated warning alerts will be sent 3 months and 1 week prior to the selected expiry date.
+                                            </p>
                                         </div>
                                     </div>
                                 </section>
@@ -292,24 +381,24 @@ export default function ClinicManagement() {
 
                                 {/* Conditional Branch Form */}
                                 {formData.has_branch && (
-                                    <div className="mt-6 space-y-5 border-t border-sky-200 pt-5 animate-fade-in-down">
+                                    <div className="mt-6 space-y-5 border-t border-sky-200 pt-5">
                                         <div>
                                             <label className="block text-xs font-semibold text-slate-600 mb-1">Branch Name</label>
-                                            <input type="text" required onChange={e => setFormData({...formData, branch_name: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm" />
+                                            <input type="text" required value={formData.branch_name} onChange={e => setFormData({...formData, branch_name: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm" />
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
                                                 <label className="block text-xs font-semibold text-slate-600 mb-1">Address Line 1 <span className="text-red-500">*</span></label>
-                                                <input type="text" required onChange={e => setFormData({...formData, branch_address_1: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm" />
+                                                <input type="text" required value={formData.branch_address_1} onChange={e => setFormData({...formData, branch_address_1: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm" />
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-semibold text-slate-600 mb-1">Address Line 2</label>
-                                                <input type="text" onChange={e => setFormData({...formData, branch_address_2: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm" />
+                                                <input type="text" value={formData.branch_address_2} onChange={e => setFormData({...formData, branch_address_2: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm" />
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-semibold text-slate-600 mb-1">Country <span className="text-red-500">*</span></label>
-                                                <select required onChange={e => setFormData({...formData, branch_country: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm bg-white">
+                                                <select required value={formData.branch_country} onChange={e => setFormData({...formData, branch_country: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm bg-white">
                                                     <option value="">Select Country</option>
                                                     <option value="US">United States</option>
                                                     <option value="IN">India</option>
@@ -319,7 +408,7 @@ export default function ClinicManagement() {
                                             <div className="flex gap-4">
                                                 <div className="flex-1">
                                                     <label className="block text-xs font-semibold text-slate-600 mb-1">State <span className="text-red-500">*</span></label>
-                                                    <select required onChange={e => setFormData({...formData, branch_state: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm bg-white">
+                                                    <select required value={formData.branch_state} onChange={e => setFormData({...formData, branch_state: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm bg-white">
                                                         <option value="">Select State</option>
                                                         <option value="NY">New York</option>
                                                         <option value="UP">Uttar Pradesh</option>
@@ -328,7 +417,7 @@ export default function ClinicManagement() {
                                                 </div>
                                                 <div className="flex-1">
                                                     <label className="block text-xs font-semibold text-slate-600 mb-1">ZIP Code <span className="text-red-500">*</span></label>
-                                                    <input type="text" required onChange={e => setFormData({...formData, branch_zip: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm" />
+                                                    <input type="text" required value={formData.branch_zip} onChange={e => setFormData({...formData, branch_zip: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm" />
                                                 </div>
                                             </div>
                                         </div>

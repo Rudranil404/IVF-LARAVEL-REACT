@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axiosClient from '../axios';
 
+// 1. IMPORT YOUR LOGO HERE
+import ProductLogo from '../assets/logo.png'; 
+
 export default function SuperAdminLogin() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false); // NEW: State for password visibility
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -30,7 +33,7 @@ export default function SuperAdminLogin() {
 
     return (
         <div className="flex min-h-screen bg-white font-sans">
-            {/* Left Side - Medical Imagery/Branding (Hidden on mobile) */}
+            {/* Left Side - Medical Imagery/Branding */}
             <div className="hidden lg:flex lg:w-7/12 relative bg-sky-900">
                 <img 
                     src="https://images.unsplash.com/photo-1581056771107-24ca5f033842?q=80&w=2070&auto=format&fit=crop" 
@@ -39,7 +42,16 @@ export default function SuperAdminLogin() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-sky-900/90 to-sky-600/40"></div>
                 <div className="relative z-10 flex flex-col justify-end p-12 text-white max-w-2xl">
-                    <h1 className="text-5xl font-bold tracking-tight mb-4">LifeCare IVF</h1>
+                    
+                    {/* 2. REPLACED TEXT TITLE WITH YOUR LOGO */}
+                    <img 
+                        src={ProductLogo} 
+                        alt="Product Logo" 
+                        className="h-20 w-auto mb-6 object-contain drop-shadow-md brightness-0 invert" 
+                        // Note: "brightness-0 invert" turns the logo pure white. 
+                        // Remove those two classes if your logo already looks good against a dark blue background!
+                    />
+                    
                     <p className="text-lg font-light leading-relaxed text-sky-100">
                         Advanced Reproductive Technologies & Comprehensive Patient Management System. Empowering clinics to deliver exceptional care.
                     </p>
@@ -52,10 +64,13 @@ export default function SuperAdminLogin() {
                     
                     {/* Header */}
                     <div className="text-center mb-8">
-                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-sky-50 text-sky-600 mb-4">
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                            </svg>
+                        {/* 3. REPLACED SHIELD ICON WITH YOUR LOGO */}
+                        <div className="inline-flex items-center justify-center mb-4">
+                            <img 
+                                src={ProductLogo} 
+                                alt="Product Logo" 
+                                className="h-16 w-auto object-contain" 
+                            />
                         </div>
                         <h2 className="text-2xl font-bold text-slate-900">System Access</h2>
                         <p className="text-sm text-slate-500 mt-2">Sign in to the Super Admin portal</p>
@@ -91,7 +106,6 @@ export default function SuperAdminLogin() {
                             <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
                                 Security Password
                             </label>
-                            {/* NEW: Relative wrapper for the input and icon */}
                             <div className="relative">
                                 <input 
                                     type={showPassword ? "text" : "password"} 
@@ -101,21 +115,17 @@ export default function SuperAdminLogin() {
                                     required 
                                     className="w-full px-4 py-3 pr-12 rounded-lg border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all"
                                 />
-                                
-                                {/* NEW: Eye Icon Button */}
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
                                     className="absolute inset-y-0 right-0 flex items-center pr-4 text-slate-400 hover:text-sky-600 transition-colors focus:outline-none"
                                 >
                                     {showPassword ? (
-                                        // Eye Off Icon (Hide)
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                             <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
                                             <line x1="1" y1="1" x2="23" y2="23"></line>
                                         </svg>
                                     ) : (
-                                        // Eye Icon (Show)
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                                             <circle cx="12" cy="12" r="3"></circle>
@@ -143,4 +153,4 @@ export default function SuperAdminLogin() {
             </div>
         </div>
     );
-}   
+}

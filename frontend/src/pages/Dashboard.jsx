@@ -2,21 +2,23 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axiosClient from '../axios';
 
+// Import our modular components
+import Sidebar from '../components/Sidebar';
+import Header from '../components/Header';
+import Footer from '../components/Footer';
+
 export default function Dashboard() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [newAdmin, setNewAdmin] = useState({ name: '', email: '', password: '', clinic_id: 1 });
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Fetch user data on load
         axiosClient.get('/api/user')
             .then(({ data }) => {
                 setUser(data);
                 setLoading(false);
             })
             .catch(() => {
-                // If unauthorized or token expired, kick to login
                 localStorage.removeItem('ACCESS_TOKEN');
                 navigate('/');
             });
@@ -31,45 +33,59 @@ export default function Dashboard() {
         navigate('/');
     };
 
-    const handleCreateClinicAdmin = async (e) => {
-        e.preventDefault();
-        try {
-            await axiosClient.post('/api/users/clinic-admin', newAdmin);
-            alert("Clinic Admin Created Successfully!");
-            setNewAdmin({ name: '', email: '', password: '', clinic_id: 1 });
-        } catch (err) {
-            alert("Error: " + (err.response?.data?.message || 'Failed'));
-        }
-    };
-
-    if (loading) return <div style={{ padding: '20px', textAlign: 'center' }}>Loading System...</div>;
-
-    const isSuperAdmin = user?.roles?.some(role => role.name === 'super_admin');
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-slate-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600"></div>
+            </div>
+        );
+    }
 
     return (
-        <div style={{ padding: '20px', fontFamily: 'system-ui', maxWidth: '1200px', margin: 'auto' }}>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #eee', paddingBottom: '15px' }}>
-                <h1 style={{ margin: 0 }}>🏥 IVF System Dashboard</h1>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <span>Welcome, <strong>{user?.name}</strong></span>
-                    <button onClick={handleLogout} style={{ background: '#dc3545', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '4px', cursor: 'pointer' }}>
-                        Logout
-                    </button>
-                </div>
-            </header>
+        <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
+            
+            {/* 1. MODULAR SIDEBAR */}
+            <Sidebar onLogout={handleLogout} />
 
-            {isSuperAdmin && (
-                <div style={{ marginTop: '30px', padding: '20px', border: '1px solid #007bff', borderRadius: '8px', background: '#f8fbff' }}>
-                    <h2>👑 Super Admin Panel: Create Clinic Admin</h2>
-                    <form onSubmit={handleCreateClinicAdmin} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '15px' }}>
-                        <input type="text" placeholder="Admin Name" value={newAdmin.name} onChange={e => setNewAdmin({...newAdmin, name: e.target.value})} required style={{ padding: '8px' }} />
-                        <input type="email" placeholder="Admin Email" value={newAdmin.email} onChange={e => setNewAdmin({...newAdmin, email: e.target.value})} required style={{ padding: '8px' }} />
-                        <input type="password" placeholder="Temporary Password" value={newAdmin.password} onChange={e => setNewAdmin({...newAdmin, password: e.target.value})} required style={{ padding: '8px' }} />
-                        <input type="number" placeholder="Clinic ID" value={newAdmin.clinic_id} onChange={e => setNewAdmin({...newAdmin, clinic_id: e.target.value})} required style={{ padding: '8px', width: '100px' }} />
-                        <button type="submit" style={{ background: '#007bff', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer' }}>Create User</button>
-                    </form>
-                </div>
-            )}
+            <div className="flex-1 flex flex-col min-w-0 bg-slate-50">
+                
+                {/* 2. MODULAR HEADER */}
+                <Header user={user} />
+
+                {/* 3. MAIN PAGE CONTENT */}
+                <main className="flex-1 overflow-y-auto p-6 md:p-8">
+                    
+                    <div className="mb-8">
+                        <h1 className="text-2xl font-bold text-slate-900">Welcome back, {user?.name?.split(' ')[0] || 'Admin'}</h1>
+                        <p className="text-slate-500 mt-1">Here is what is happening across your clinics today.</p>
+                    </div>
+
+                    {/* Stat Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        {['Total Clinics Actively Managed', 'Registered Patients', 'Pending Appointments'].map((title, i) => (
+                            <div key={i} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex items-center">
+                                <div className={`h-12 w-12 rounded-lg flex items-center justify-center mr-4 ${i===0?'bg-blue-50 text-blue-600':i===1?'bg-emerald-50 text-emerald-600':'bg-amber-50 text-amber-600'}`}>
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-slate-500">{title}</p>
+                                    <p className="text-2xl font-bold text-slate-800">{[12, 1430, 28][i]}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Additional Dashboard Widgets can go here in the future */}
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8 p-8 flex items-center justify-center text-slate-400 border-dashed border-2">
+                        <p>Additional widgets and data charts will appear here.</p>
+                    </div>
+
+                </main>
+
+                {/* 4. MODULAR FOOTER */}
+                <Footer />
+                
+            </div>
         </div>
     );
 }

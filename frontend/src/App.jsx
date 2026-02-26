@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import SuperAdminLogin from './pages/SuperAdminLogin';
 import Dashboard from './pages/Dashboard';
+import ClinicManagement from './pages/ClinicManagement';
 
 // Route Protection: Kicks user to login if they have no token
 function ProtectedRoute({ children }) {
@@ -43,7 +44,16 @@ function App() {
                         </ProtectedRoute>
                     } 
                 />
-                
+                <Route 
+                    path="/clinics" 
+                    element={
+                        <ProtectedRoute>
+                            {/* Note: In your actual ClinicManagement.jsx, you will need to wrap the content 
+                                in the <Sidebar /> and <Header /> layout just like we did in Dashboard.jsx! */}
+                            <ClinicManagement />
+                        </ProtectedRoute>
+                    } 
+                />
                 {/* 3. 404 Fallback */}
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

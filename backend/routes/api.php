@@ -13,10 +13,11 @@ Route::post('/login', [AuthController::class, 'login']);
 // Protected Routes (Require Login Token)
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
-    
+    Route::get('/dashboard/stats', [App\Http\Controllers\DashboardController::class, 'stats']);
     // Get current logged-in user
+    // Get current logged-in user with roles AND clinic data
     Route::get('/user', function (Request $request) {
-        return response()->json($request->user()->load('roles'));
+        return response()->json($request->user()->load(['roles', 'clinic']));
     });
 
     // ==========================================
@@ -27,7 +28,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/clinics/provision', [ClinicController::class, 'provision']);
         Route::post('/clinics/{clinic}/impersonate', [ClinicController::class, 'impersonate']);
     });
-
+    
     // ==========================================
     // STANDARD RESOURCES
     // ==========================================

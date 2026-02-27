@@ -3,6 +3,9 @@ import SuperAdminLogin from './pages/SuperAdminLogin';
 import Dashboard from './pages/Dashboard';
 import ClinicManagement from './pages/ClinicManagement';
 
+// ⚠️ NEW: Import the Clinic-centric dashboard
+import ClinicDashboard from './pages/ClinicDashboard';
+
 // Route Protection: Kicks user to login if they have no token
 function ProtectedRoute({ children }) {
     const token = localStorage.getItem('ACCESS_TOKEN');
@@ -16,6 +19,7 @@ function ProtectedRoute({ children }) {
 function GuestRoute({ children }) {
     const token = localStorage.getItem('ACCESS_TOKEN');
     if (token) {
+        // Send to default dashboard; the components themselves will handle role-based redirects
         return <Navigate to="/dashboard" replace />;
     }
     return children;
@@ -35,7 +39,7 @@ function App() {
                     } 
                 />
 
-                {/* 2. Dashboard Page (Logged In Only) */}
+                {/* 2. SUPER ADMIN: Dashboard Page (Logged In Only) */}
                 <Route 
                     path="/dashboard" 
                     element={
@@ -44,17 +48,28 @@ function App() {
                         </ProtectedRoute>
                     } 
                 />
+                
+                {/* 3. SUPER ADMIN: Clinic Management */}
                 <Route 
                     path="/clinics" 
                     element={
                         <ProtectedRoute>
-                            {/* Note: In your actual ClinicManagement.jsx, you will need to wrap the content 
-                                in the <Sidebar /> and <Header /> layout just like we did in Dashboard.jsx! */}
                             <ClinicManagement />
                         </ProtectedRoute>
                     } 
                 />
-                {/* 3. 404 Fallback */}
+
+                {/* 4. CLINIC ADMIN: Operations Dashboard */}
+                <Route 
+                    path="/clinic-dashboard" 
+                    element={
+                        <ProtectedRoute>
+                            <ClinicDashboard />
+                        </ProtectedRoute>
+                    } 
+                />
+
+                {/* 5. 404 Fallback */}
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </BrowserRouter>

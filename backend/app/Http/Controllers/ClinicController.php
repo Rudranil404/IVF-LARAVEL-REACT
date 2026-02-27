@@ -127,7 +127,75 @@ class ClinicController extends Controller
             ], 500);
         }
     }
+    public function update(Request $request, $id)
+    {
+        $clinic = Clinic::findOrFail($id);
 
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'required|string|max:20',
+            'address' => 'required|string',
+            'email' => 'required|email|unique:clinics,email,' . $id,
+            'max_branches' => 'required|integer|min:0',
+            'expiry_date' => 'required|date',
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
+            'clinic_contacts' => 'required|string',
+            
+            // Branch validation (only if has_branch is true)
+            'has_branch' => 'required',
+            'branch_name' => 'required_if:has_branch,true',
+            'branch_address_1' => 'required_if:has_branch,true',
+            'branch_country' => 'required_if:has_branch,true',
+            'branch_state' => 'required_if:has_branch,true',
+            'branch_zip' => 'required_if:has_branch,true',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            if ($request->hasFile('logo')) {
+                if ($clinic->logo_path) Storage::disk('public')->delete($clinic->logo_path);
+                $clinic->logo_path = $request->file('logo')->store('clinics/logos', 'public');
+            }
+
+            $expiryDate = Carbon::parse($request->expiry_date);
+            
+            // Update Master Clinic
+            $clinic->update([
+                'name' => $request->name,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'address' => $request->address,
+                'max_branches' => $request->max_branches,
+                'expiry_date' => $expiryDate,
+                'first_warning_date' => $expiryDate->copy()->subMonths(3),
+                'second_warning_date' => $expiryDate->copy()->subWeeks(1),
+                'contacts' => json_decode($request->clinic_contacts, true),
+            ]);
+
+            // Create New Branch if toggled during edit
+            if (filter_var($request->has_branch, FILTER_VALIDATE_BOOLEAN)) {
+                $branchContacts = json_decode($request->branch_contacts, true) ?? [];
+                $fullBranchAddress = sprintf("%s %s, %s, %s %s", $request->branch_address_1, $request->branch_address_2 ?? '', $request->branch_state, $request->branch_country, $request->branch_zip);
+
+                Clinic::create([
+                    'name' => $request->branch_name,
+                    'email' => $request->email, 
+                    'phone' => $branchContacts[0]['phone'] ?? $request->phone,
+                    'address' => trim($fullBranchAddress),
+                    'parent_clinic_id' => $clinic->id,
+                    'logo_path' => $clinic->logo_path,
+                    'contacts' => $branchContacts,
+                    'is_active' => true,
+                ]);
+            }
+
+            DB::commit();
+            return response()->json(['message' => 'Clinic updated successfully', 'clinic' => $clinic]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Update failed', 'error' => $e->getMessage()], 500);
+        }
+    }
     public function impersonate($id)
     {
         if (!auth()->user()->hasRole('super_admin')) {

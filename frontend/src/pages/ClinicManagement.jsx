@@ -66,7 +66,8 @@ export default function ClinicManagement() {
     const handleLogout = async () => {
         try { await axiosClient.post('/api/logout'); } catch(e) {}
         localStorage.removeItem('ACCESS_TOKEN');
-        navigate('/');
+        // 👇 Change this line to point to the admin login
+        navigate('/admin'); 
     };
 
     const fetchClinics = async () => {
@@ -172,9 +173,14 @@ export default function ClinicManagement() {
         if(!window.confirm("Log in as this clinic's administrator?")) return;
         try {
             const { data } = await axiosClient.post(`/api/clinics/${clinicId}/impersonate`);
+            
+            // Overwrite the Super Admin token with the Clinic Admin token
             localStorage.setItem('ACCESS_TOKEN', data.access_token);
-            window.location.href = '/dashboard'; 
+            
+            // ⚠️ Redirect to the CLINIC dashboard, not the Super Admin dashboard
+            window.location.href = '/clinic-dashboard'; 
         } catch (e) {
+            console.error(e.response?.data);
             alert("Impersonation failed. Ensure you have Super Admin privileges.");
         }
     };
@@ -290,7 +296,7 @@ export default function ClinicManagement() {
                             </div>
                             
                             {/* Scrollable Form Body */}
-                            <div className="p-6 md:p-8 space-y-10 flex-1 overflow-y-auto">
+                            <div className="p-6 md:p-8 space-y-10 flex-1 overflow-y-auto pb-12">
                                 <datalist id="position-options">
                                     <option value="Director" />
                                     <option value="Manager" />

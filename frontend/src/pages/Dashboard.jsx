@@ -25,12 +25,10 @@ export default function Dashboard() {
     }, [navigate]);
 
     const handleLogout = async () => {
-        try {
-            await axiosClient.post('/api/logout');
-        } catch(e) { console.error(e); }
-        
+        try { await axiosClient.post('/api/logout'); } catch(e) {}
         localStorage.removeItem('ACCESS_TOKEN');
-        navigate('/');
+        // 👇 Change this line to point to the admin login
+        navigate('/admin'); 
     };
 
     if (loading) {

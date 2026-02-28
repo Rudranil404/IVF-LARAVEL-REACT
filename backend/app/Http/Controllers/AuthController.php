@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
@@ -14,20 +13,33 @@ class AuthController extends Controller
         $request->validate([
             'email' => 'required|email',
             'password' => 'required',
+            'login_type' => 'required|in:super_admin,clinic' // ⚠️ Require portal type
         ]);
 
         $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json(['message' => 'Invalid login credentials'], 401);
+            return response()->json(['message' => 'Invalid credentials. Please try again.'], 401);
         }
 
-        // Create Sanctum Token
+        $isSuperAdmin = $user->hasRole('super_admin');
+
+        // ⚠️ STRICT CROSS-LOGIN PREVENTION
+        if ($request->login_type === 'super_admin' && !$isSuperAdmin) {
+            return response()->json(['message' => 'Access Denied: You do not have Super Admin privileges.'], 403);
+        }
+
+        if ($request->login_type === 'clinic' && $isSuperAdmin) {
+            return response()->json(['message' => 'Access Denied: Super Admins must use the Central Admin Portal.'], 403);
+        }
+
+        // If passed, issue token
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'access_token' => $token,
-            'user' => $user->load('roles') // Send back user info + their role
+            'message' => 'Login successful',
+            'token' => $token,
+            'user' => $user->load('roles', 'clinic')
         ]);
     }
 

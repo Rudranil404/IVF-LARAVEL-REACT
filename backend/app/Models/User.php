@@ -19,7 +19,7 @@ class User extends Authenticatable
         'password',
         'clinic_id', // Add this if Clinic Admins belong to a specific clinic
     ];
-
+    protected $guard_name = 'sanctum';
     protected $hidden = [
         'password',
         'remember_token',
@@ -31,5 +31,12 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+    /**
+     * Relationship: A User belongs to a specific Clinic
+     */
+    public function clinic()
+    {
+        return $this->belongsTo(Clinic::class, 'clinic_id'); // ⚠️ Ensure 'clinic_id' is explicitly stated here
     }
 }

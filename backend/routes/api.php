@@ -14,25 +14,35 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/dashboard/stats', [App\Http\Controllers\DashboardController::class, 'stats']);
-    // Get current logged-in user
-    // Get current logged-in user with roles AND clinic data
+    
+    // Get current logged-in user safely (handles null clinics for Super Admins)
     Route::get('/user', function (Request $request) {
-        return response()->json($request->user()->load(['roles', 'clinic']));
+        $user = $request->user()->load('roles');
+        
+        // Only load the clinic relationship if the user actually belongs to one
+        if ($user->clinic_id !== null) {
+            $user->load('clinic');
+        }
+        
+        return response()->json($user);
     });
 
     // ==========================================
     // SUPER ADMIN ONLY ROUTES
     // ==========================================
-    Route::middleware('role:super_admin')->group(function () {
-        // ⚠️ CRITICAL: Custom routes MUST go before apiResource!
+    // ⚠️ CRITICAL: Added ',sanctum' to force Spatie to use API tokens!
+    Route::middleware('role:super_admin,sanctum')->group(function () {
+        // Custom routes MUST go before apiResource!
         Route::post('/clinics/provision', [ClinicController::class, 'provision']);
         Route::post('/clinics/{clinic}/impersonate', [ClinicController::class, 'impersonate']);
+        
+        // Moved inside Super Admin group to secure standard clinic endpoints
+        Route::apiResource('clinics', ClinicController::class);
     });
     
     // ==========================================
-    // STANDARD RESOURCES
+    // STANDARD RESOURCES (For Clinic Admins & Staff)
     // ==========================================
     // These must stay at the bottom of the group!
-    Route::apiResource('clinics', ClinicController::class);
     Route::apiResource('patients', PatientController::class);
 });

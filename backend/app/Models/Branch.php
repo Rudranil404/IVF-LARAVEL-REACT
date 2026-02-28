@@ -18,14 +18,14 @@ class Branch extends Model
         'branch_state',
         'branch_zip',
         'branch_contacts',
+        'is_active', // ⚠️ CRITICAL: This must be here!
     ];
 
-    // Automatically convert JSON to Array when fetching from DB
     protected $casts = [
         'branch_contacts' => 'array',
+        'is_active' => 'boolean', // ⚠️ Add this to ensure it casts correctly
     ];
 
-    // Relationship back to Clinic
     public function clinic()
     {
         return $this->belongsTo(Clinic::class);

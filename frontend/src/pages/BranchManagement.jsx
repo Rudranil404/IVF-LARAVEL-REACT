@@ -5,7 +5,9 @@ import ClinicSidebar from '../components/ClinicSidebar';
 import Header from '../components/Header';
 import { Country, State } from 'country-state-city';
 
-// --- Searchable Select Component ---
+// --------------------------------------------------------
+// 🎨 CUSTOM COMPONENT: Searchable Dropdown
+// --------------------------------------------------------
 const SearchableSelect = ({ options, value, onChange, placeholder, disabled }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -14,6 +16,7 @@ const SearchableSelect = ({ options, value, onChange, placeholder, disabled }) =
     const selectedOption = options.find(opt => opt.value === value);
     const filteredOptions = options.filter(opt => opt.label.toLowerCase().includes(search.toLowerCase()));
 
+    // Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -27,6 +30,7 @@ const SearchableSelect = ({ options, value, onChange, placeholder, disabled }) =
 
     return (
         <div className="relative" ref={dropdownRef}>
+            {/* Main Select Button */}
             <div
                 className={`w-full px-4 py-2.5 rounded-lg border border-slate-300 text-sm flex justify-between items-center transition-colors 
                 ${disabled ? 'bg-slate-50 opacity-60 cursor-not-allowed' : 'bg-white cursor-pointer hover:border-indigo-400 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500'}`}
@@ -37,20 +41,37 @@ const SearchableSelect = ({ options, value, onChange, placeholder, disabled }) =
                 </span>
                 <svg className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
             </div>
+
+            {/* Dropdown Menu */}
             {isOpen && !disabled && (
                 <div className="absolute z-[100] w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-64 flex flex-col overflow-hidden animate-fade-in">
                     <div className="p-2 border-b border-slate-100 bg-slate-50 shrink-0">
                         <div className="relative">
                             <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                            <input type="text" className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-md text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />
+                            <input 
+                                type="text" 
+                                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-md text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" 
+                                placeholder="Search..." 
+                                value={search} 
+                                onChange={(e) => setSearch(e.target.value)} 
+                                autoFocus 
+                            />
                         </div>
                     </div>
-                    <ul className="overflow-y-auto flex-1 p-1">
+                    <ul className="overflow-y-auto flex-1 p-1 custom-scrollbar">
                         {filteredOptions.length === 0 ? (
                             <li className="px-3 py-4 text-sm text-slate-500 text-center">No results found</li>
                         ) : (
                             filteredOptions.map(opt => (
-                                <li key={opt.value} className={`px-3 py-2 text-sm rounded-md cursor-pointer transition-colors ${value === opt.value ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'}`} onClick={() => { onChange(opt.value); setIsOpen(false); setSearch(''); }}>
+                                <li 
+                                    key={opt.value} 
+                                    className={`px-3 py-2 text-sm rounded-md cursor-pointer transition-colors ${value === opt.value ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'}`} 
+                                    onClick={() => { 
+                                        onChange(opt.value); 
+                                        setIsOpen(false); 
+                                        setSearch(''); 
+                                    }}
+                                >
                                     {opt.label}
                                 </li>
                             ))
@@ -61,6 +82,7 @@ const SearchableSelect = ({ options, value, onChange, placeholder, disabled }) =
         </div>
     );
 };
+// --------------------------------------------------------
 
 export default function BranchManagement() {
     const navigate = useNavigate();
@@ -69,24 +91,52 @@ export default function BranchManagement() {
     const [branches, setBranches] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     
-    // Modal State
+    // --- Create/Edit Branch Modal State ---
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [selectedBranchId, setSelectedBranchId] = useState(null);
 
+    // --- View/Add Admins Modal State ---
+    const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+    const [adminModalView, setAdminModalView] = useState('list'); // 'list' | 'add'
+    const [clinicAdmins, setClinicAdmins] = useState([]);
+    const [loadingAdmins, setLoadingAdmins] = useState(false);
+    const [isSavingAdmin, setIsSavingAdmin] = useState(false);
+    
+    // ⚠️ NEW: Password Reveal State
+    const [showAdminPassword, setShowAdminPassword] = useState(false);
+    
+    const [adminFormData, setAdminFormData] = useState({
+        name: '', email: '', password: '', branch_id: ''
+    });
+
+    // Initial Form Configurations
     const emptyContact = { phone: '', name: '', position: '' };
-    const initialFormState = { branch_name: '', branch_address_1: '', branch_address_2: '', branch_country: '', branch_state: '', branch_zip: '', branch_contacts: [{ ...emptyContact }] };
+    const initialFormState = { 
+        branch_name: '', branch_address_1: '', branch_address_2: '', 
+        branch_country: '', branch_state: '', branch_zip: '', 
+        branch_contacts: [{ ...emptyContact }] 
+    };
     const [formData, setFormData] = useState(initialFormState);
 
+    // Dropdown Data Preparation
     const countryOptions = Country.getAllCountries().map(c => ({ value: c.isoCode, label: c.name }));
     const stateOptions = formData.branch_country ? State.getStatesOfCountry(formData.branch_country).map(s => ({ value: s.isoCode, label: s.name })) : [];
 
+    // On Load
     useEffect(() => {
         axiosClient.get('/api/user')
-            .then(({ data }) => { setUser(data); fetchBranches(); })
-            .catch(() => navigate('/'));
+            .then(({ data }) => { 
+                setUser(data); 
+                fetchBranches(); 
+            })
+            .catch(() => {
+                localStorage.removeItem('ACCESS_TOKEN');
+                navigate('/');
+            });
     }, [navigate]);
 
+    // --- API Calls ---
     const fetchBranches = async () => {
         try {
             const { data } = await axiosClient.get('/api/branches');
@@ -98,28 +148,44 @@ export default function BranchManagement() {
         }
     };
 
-    // Form Handlers
-    const handleCreateClick = () => { setFormData(initialFormState); setIsEditMode(false); setIsModalOpen(true); };
-    const handleEditClick = (branch) => {
-        setFormData({
-            branch_name: branch.branch_name || '', branch_address_1: branch.branch_address_1 || '', branch_address_2: branch.branch_address_2 || '',
-            branch_country: branch.branch_country || '', branch_state: branch.branch_state || '', branch_zip: branch.branch_zip || '',
-            branch_contacts: branch.branch_contacts && branch.branch_contacts.length > 0 ? branch.branch_contacts : [{ ...emptyContact }]
-        });
-        setSelectedBranchId(branch.id);
-        setIsEditMode(true);
-        setIsModalOpen(true);
+    // --- Admin Actions ---
+    const fetchAdmins = async () => {
+        setLoadingAdmins(true);
+        try {
+            const { data } = await axiosClient.get('/api/clinic/admins');
+            setClinicAdmins(data);
+        } catch (error) {
+            console.error("Failed to fetch admins", error);
+        } finally {
+            setLoadingAdmins(false);
+        }
     };
 
-    const handleContactChange = (index, field, value) => {
-        const newContacts = [...formData.branch_contacts];
-        newContacts[index][field] = value;
-        setFormData({ ...formData, branch_contacts: newContacts });
+    const handleViewAdminsClick = () => {
+        setIsAdminModalOpen(true);
+        setAdminModalView('list');
+        setShowAdminPassword(false); // Reset password visibility when opening
+        fetchAdmins();
     };
-    const addContact = () => setFormData({ ...formData, branch_contacts: [...formData.branch_contacts, { ...emptyContact }] });
-    const removeContact = (index) => setFormData({ ...formData, branch_contacts: formData.branch_contacts.filter((_, i) => i !== index) });
 
-    // API Actions
+    const handleSaveAdmin = async (e) => {
+        e.preventDefault();
+        setIsSavingAdmin(true);
+        try {
+            await axiosClient.post('/api/clinic/admins', adminFormData);
+            alert("Admin created and assigned successfully!");
+            setAdminFormData({ name: '', email: '', password: '', branch_id: '' });
+            setShowAdminPassword(false);
+            setAdminModalView('list');
+            fetchAdmins(); // Refresh the admin list after saving
+        } catch (error) {
+            alert(error.response?.data?.message || "Failed to create admin.");
+        } finally {
+            setIsSavingAdmin(false);
+        }
+    };
+
+    // --- Branch Actions ---
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
@@ -129,7 +195,9 @@ export default function BranchManagement() {
             alert(isEditMode ? 'Branch updated successfully!' : 'Branch created successfully!');
             setIsModalOpen(false);
             fetchBranches();
-        } catch (error) { alert(error.response?.data?.message || "Operation failed."); }
+        } catch (error) { 
+            alert(error.response?.data?.message || "Operation failed."); 
+        }
     };
 
     const handleToggleStatus = async (id, currentStatus) => {
@@ -148,23 +216,63 @@ export default function BranchManagement() {
         } catch (err) { alert("Failed to delete branch."); }
     };
 
-    // Derived Metrics
+
+    // --- Form Handlers ---
+    const handleCreateClick = () => { 
+        setFormData(initialFormState); 
+        setIsEditMode(false); 
+        setIsModalOpen(true); 
+    };
+
+    const handleEditClick = (branch) => {
+        setFormData({
+            branch_name: branch.branch_name || '', 
+            branch_address_1: branch.branch_address_1 || '', 
+            branch_address_2: branch.branch_address_2 || '',
+            branch_country: branch.branch_country || '', 
+            branch_state: branch.branch_state || '', 
+            branch_zip: branch.branch_zip || '',
+            branch_contacts: branch.branch_contacts && branch.branch_contacts.length > 0 ? branch.branch_contacts : [{ ...emptyContact }]
+        });
+        setSelectedBranchId(branch.id);
+        setIsEditMode(true);
+        setIsModalOpen(true);
+    };
+
+    // When country changes, clear out the selected state so they don't mismatch
+    const handleCountryChange = (val) => {
+        setFormData({ ...formData, branch_country: val, branch_state: '' });
+    };
+
+    // Dynamic Contact array handlers
+    const handleContactChange = (index, field, value) => {
+        const newContacts = [...formData.branch_contacts];
+        newContacts[index][field] = value;
+        setFormData({ ...formData, branch_contacts: newContacts });
+    };
+    const addContact = () => setFormData({ ...formData, branch_contacts: [...formData.branch_contacts, { ...emptyContact }] });
+    const removeContact = (index) => setFormData({ ...formData, branch_contacts: formData.branch_contacts.filter((_, i) => i !== index) });
+
+
+    // --- Derived Metrics for UI ---
     const totalBranches = branches.length;
     const activeBranches = branches.filter(b => b.is_active !== false).length;
     const suspendedBranches = totalBranches - activeBranches;
     const filteredBranches = branches.filter(b => b.branch_name.toLowerCase().includes(searchTerm.toLowerCase()));
 
+    // --- Loading State ---
     if (loading) return <div className="flex h-screen items-center justify-center bg-[#f8f9fa]"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>;
 
     return (
         <div className="flex h-screen bg-[#f8f9fa] font-sans overflow-hidden">
+            {/* Sidebar */}
             <ClinicSidebar onLogout={() => { localStorage.removeItem('ACCESS_TOKEN'); navigate('/'); }} clinic={user?.clinic} />
 
             <div className="flex-1 flex flex-col min-w-0">
                 <Header user={user} />
                 <main className="flex-1 overflow-y-auto p-6 md:p-8">
                     
-                    {/* Top Header Row matching Image */}
+                    {/* Top Header Row */}
                     <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
                         <div>
                             <h1 className="text-2xl font-bold text-slate-800">Overview</h1>
@@ -173,7 +281,13 @@ export default function BranchManagement() {
                         <div className="flex items-center gap-4">
                             <div className="relative">
                                 <svg className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                                <input type="text" placeholder="Search branches..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-64 pl-9 pr-4 py-2.5 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-sm shadow-sm" />
+                                <input 
+                                    type="text" 
+                                    placeholder="Search branches..." 
+                                    value={searchTerm} 
+                                    onChange={e => setSearchTerm(e.target.value)} 
+                                    className="w-64 pl-9 pr-4 py-2.5 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-sm shadow-sm" 
+                                />
                             </div>
                             <button onClick={handleCreateClick} className="bg-[#4f46e5] hover:bg-[#4338ca] text-white px-5 py-2.5 rounded-lg font-medium text-sm transition-colors shadow-sm flex items-center shrink-0">
                                 + Add Branch
@@ -181,7 +295,7 @@ export default function BranchManagement() {
                         </div>
                     </div>
 
-                    {/* Stats Cards matching Image */}
+                    {/* Stats Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                         <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex justify-between items-center">
                             <div>
@@ -212,9 +326,9 @@ export default function BranchManagement() {
                         </div>
                     </div>
 
-                    {/* Complex Table matching Image */}
+                    {/* Complex Table List */}
                     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden mb-10">
-                        {/* Table Header */}
+                        {/* Table Header Row */}
                         <div className="hidden lg:grid grid-cols-12 gap-4 px-6 py-4 bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                             <div className="col-span-3">Location & Branch</div>
                             <div className="col-span-4">Details</div>
@@ -234,8 +348,12 @@ export default function BranchManagement() {
                                 </div>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
-                                <button className="px-3 py-1.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-100 text-xs font-semibold hover:bg-indigo-100 transition-colors">View Admins</button>
-                                <button className="px-3 py-1.5 rounded bg-orange-50 text-orange-600 border border-orange-100 text-xs font-semibold hover:bg-orange-100 transition-colors">Edit Settings</button>
+                                <button onClick={handleViewAdminsClick} className="px-3 py-1.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-100 text-xs font-semibold hover:bg-indigo-100 transition-colors">
+                                    View Admins
+                                </button>
+                                <button className="px-3 py-1.5 rounded bg-orange-50 text-orange-600 border border-orange-100 text-xs font-semibold hover:bg-orange-100 transition-colors">
+                                    Edit Settings
+                                </button>
                                 <button onClick={handleCreateClick} className="px-4 py-1.5 rounded bg-[#4f46e5] text-white text-xs font-semibold shadow-sm hover:bg-[#4338ca] transition-colors flex items-center gap-1">
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                                     Add Branch
@@ -246,7 +364,7 @@ export default function BranchManagement() {
                         {/* Child Rows (Branches) */}
                         <div className="divide-y divide-slate-100">
                             {filteredBranches.length === 0 ? (
-                                <div className="p-10 text-center text-slate-500 text-sm">No branches found.</div>
+                                <div className="p-10 text-center text-slate-500 text-sm">No branches found matching your search.</div>
                             ) : filteredBranches.map((branch) => {
                                 const contact = branch.branch_contacts?.[0];
                                 const isActive = branch.is_active !== false;
@@ -302,23 +420,20 @@ export default function BranchManagement() {
                 </main>
             </div>
 
-            {/* Modal Form remains exactly the same logic, omitted here for brevity to keep snippet clean. Keep your existing modal code starting at: {isModalOpen && ( ... */}
-            
-            {/* --- CREATE / EDIT MODAL --- */}
+            {/* ==========================================
+                CREATE / EDIT BRANCH MODAL
+            ========================================== */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[95vh] overflow-hidden animate-fade-in">
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6 animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[95vh] overflow-hidden">
                         
+                        {/* Modal Header */}
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
-                            <div>
-                                <h2 className="text-xl font-bold text-slate-800">{isEditMode ? 'Edit Branch' : 'Add New Branch'}</h2>
-                                <p className="text-xs text-slate-500 mt-1">Configure location and contact details.</p>
-                            </div>
-                            <button type="button" onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-colors">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                            </button>
+                            <div><h2 className="text-xl font-bold text-slate-800">{isEditMode ? 'Edit Branch' : 'Add New Branch'}</h2><p className="text-xs text-slate-500 mt-1">Configure location and contact details.</p></div>
+                            <button type="button" onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-colors"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
                         </div>
 
+                        {/* Modal Body */}
                         <form id="branch-form" onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
                             <div className="p-6 md:p-8 space-y-8 flex-1 overflow-y-auto pb-12 custom-scrollbar">
                                 
@@ -346,17 +461,19 @@ export default function BranchManagement() {
                                             <input type="text" value={formData.branch_address_2} onChange={e => setFormData({...formData, branch_address_2: e.target.value})} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm" />
                                         </div>
                                         
+                                        {/* CUSTOM SEARCHABLE DROPDOWN FOR COUNTRY */}
                                         <div className="relative">
                                             <label className="block text-[11px] font-semibold text-slate-600 mb-1">Country *</label>
                                             <SearchableSelect 
                                                 options={countryOptions}
                                                 value={formData.branch_country}
                                                 placeholder="Search Country..."
-                                                onChange={(val) => setFormData({ ...formData, branch_country: val, branch_state: '' })}
+                                                onChange={handleCountryChange}
                                             />
                                         </div>
 
                                         <div className="flex gap-4">
+                                            {/* CUSTOM SEARCHABLE DROPDOWN FOR STATE */}
                                             <div className="flex-1 relative">
                                                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">State *</label>
                                                 <SearchableSelect 
@@ -421,6 +538,143 @@ export default function BranchManagement() {
                     </div>
                 </div>
             )}
+
+            {/* ==========================================
+                VIEW / ADD ADMINS MODAL
+            ========================================== */}
+            {isAdminModalOpen && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden">
+                        
+                        {/* Header */}
+                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold text-slate-800">
+                                        {adminModalView === 'list' ? 'Organization Admins' : 'Add New Admin'}
+                                    </h2>
+                                    <p className="text-xs text-slate-500">
+                                        {adminModalView === 'list' ? 'Users with master access.' : 'Create credentials & assign branch.'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {adminModalView === 'list' ? (
+                                    <button onClick={() => setAdminModalView('add')} className="px-3 py-1.5 bg-[#4f46e5] text-white text-xs font-semibold rounded hover:bg-[#4338ca] shadow-sm transition-colors">
+                                        + Add Admin
+                                    </button>
+                                ) : (
+                                    <button onClick={() => setAdminModalView('list')} className="px-3 py-1.5 bg-white border border-slate-300 text-slate-700 text-xs font-semibold rounded hover:bg-slate-50 transition-colors">
+                                        Back to List
+                                    </button>
+                                )}
+                                <button onClick={() => setIsAdminModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Body - LIST VIEW */}
+                        {adminModalView === 'list' && (
+                            <div className="p-0 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                                {loadingAdmins ? (
+                                    <div className="p-10 flex justify-center items-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+                                ) : clinicAdmins.length === 0 ? (
+                                    <div className="p-10 text-center text-sm text-slate-500">No active administrators found.</div>
+                                ) : (
+                                    <ul className="divide-y divide-slate-100">
+                                        {clinicAdmins.map((admin) => (
+                                            <li key={admin.id} className="p-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm uppercase">{admin.name.charAt(0)}</div>
+                                                    <div>
+                                                        <p className="text-sm font-bold text-slate-800">{admin.name}</p>
+                                                        <p className="text-xs text-slate-500">{admin.email}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col items-end">
+                                                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-wider rounded-full border border-indigo-100 mb-1">Master</span>
+                                                    {admin.branch_id && (
+                                                        <span className="text-[10px] text-slate-400 font-semibold truncate max-w-[120px]">
+                                                            {branches.find(b => b.id === admin.branch_id)?.branch_name || 'Assigned Branch'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Body - ADD VIEW */}
+                        {adminModalView === 'add' && (
+                            <form id="admin-form" onSubmit={handleSaveAdmin} className="p-6 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                                <div>
+                                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Full Name *</label>
+                                    <input type="text" required value={adminFormData.name} onChange={e => setAdminFormData({...adminFormData, name: e.target.value})} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm" placeholder="e.g. Sarah Connor" />
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Email Address *</label>
+                                    <input type="email" required value={adminFormData.email} onChange={e => setAdminFormData({...adminFormData, email: e.target.value})} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm" placeholder="admin@clinic.com" />
+                                </div>
+                                
+                                {/* ⚠️ REVEAL/HIDE PASSWORD INPUT */}
+                                <div>
+                                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Temporary Password *</label>
+                                    <div className="relative">
+                                        <input 
+                                            type={showAdminPassword ? "text" : "password"} 
+                                            required 
+                                            minLength="6" 
+                                            value={adminFormData.password} 
+                                            onChange={e => setAdminFormData({...adminFormData, password: e.target.value})} 
+                                            className="w-full pl-4 pr-10 py-2.5 rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm" 
+                                            placeholder="••••••••" 
+                                        />
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setShowAdminPassword(!showAdminPassword)} 
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                                        >
+                                            {showAdminPassword ? (
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                            ) : (
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path></svg>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Assign to Branch (Optional)</label>
+                                    <select value={adminFormData.branch_id} onChange={e => setAdminFormData({...adminFormData, branch_id: e.target.value})} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-sm bg-white">
+                                        <option value="">Master Organization Level (All Branches)</option>
+                                        {branches.map(b => (
+                                            <option key={b.id} value={b.id}>{b.branch_name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </form>
+                        )}
+
+                        {/* Footer */}
+                        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
+                            {adminModalView === 'list' ? (
+                                <button onClick={() => setIsAdminModalOpen(false)} className="px-5 py-2 rounded-lg bg-white border border-slate-300 text-slate-700 font-medium text-sm hover:bg-slate-50 transition-colors shadow-sm">Close</button>
+                            ) : (
+                                <button type="submit" form="admin-form" disabled={isSavingAdmin} className="px-6 py-2.5 rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] disabled:bg-indigo-300 text-white font-medium text-sm shadow-sm transition-colors flex items-center">
+                                    {isSavingAdmin ? 'Saving...' : 'Save Admin User'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 }

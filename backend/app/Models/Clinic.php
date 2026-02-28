@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Clinic extends Model
 {
@@ -14,9 +16,9 @@ class Clinic extends Model
         'email',
         'phone',
         'address',
-        'parent_clinic_id', // Links a branch to its master clinic
-        'logo_path',        // Path to the uploaded logo
-        'contacts',         // JSON Array of dynamic phone numbers/roles
+        'logo_path',
+        'contacts',
+        'parent_clinic_id',
         'max_branches',
         'expiry_date',
         'first_warning_date',
@@ -24,46 +26,38 @@ class Clinic extends Model
         'is_active',
     ];
 
-    /**
-     * The attributes that should be cast to native types.
-     */
     protected $casts = [
+        'contacts' => 'array',
         'is_active' => 'boolean',
-        'contacts' => 'array', // Magic: Auto-handles JSON encode/decode
         'expiry_date' => 'date',
         'first_warning_date' => 'date',
         'second_warning_date' => 'date',
     ];
 
     /**
-     * Get the parent clinic if this is a branch (Legacy/Self-referential).
+     * Get the Master Clinic (Parent)
      */
-    public function parentClinic()
+    public function masterClinic(): BelongsTo
     {
         return $this->belongsTo(Clinic::class, 'parent_clinic_id');
     }
 
     /**
-     * Get all patients belonging to this clinic.
+     * Get all Sub-Branches (Children)
+     * This replaces your old 'Branch::class' call
      */
-    public function patients()
+    public function branches(): HasMany
+    {
+        return $this->hasMany(Clinic::class, 'parent_clinic_id');
+    }
+
+    public function patients(): HasMany
     {
         return $this->hasMany(Patient::class);
     }
 
-    /**
-     * Get all system users/admins associated with this clinic.
-     */
-    public function users()
+    public function users(): HasMany
     {
         return $this->hasMany(User::class);
-    }
-
-    /**
-     * Get all branch locations associated with this clinic.
-     */
-    public function branches()
-    {
-        return $this->hasMany(Branch::class);
     }
 }

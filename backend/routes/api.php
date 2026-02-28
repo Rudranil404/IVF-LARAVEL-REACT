@@ -6,6 +6,7 @@ use App\Http\Controllers\ClinicController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\BranchController;
 
 // Public Auth Route
 Route::post('/login', [AuthController::class, 'login']);
@@ -15,7 +16,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/dashboard/stats', [App\Http\Controllers\DashboardController::class, 'stats']);
     // ... inside Route::middleware('auth:sanctum')->group(function () {
-    
+    Route::get('/clinic/admins', [\App\Http\Controllers\ClinicController::class, 'getAdmins']);
+    Route::post('/clinic/admins', [\App\Http\Controllers\ClinicController::class, 'storeAdmin']); // ⚠️ ADD THIS
     Route::patch('/branches/{id}/toggle-status', [BranchController::class, 'toggleStatus']);
     Route::apiResource('branches', BranchController::class);
     Route::apiResource('patients', PatientController::class);

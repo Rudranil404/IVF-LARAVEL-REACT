@@ -127,6 +127,49 @@ class ClinicController extends Controller
             ], 500);
         }
     }
+    /**
+     * Create a new admin user and assign them to a branch.
+     */
+    public function storeAdmin(\Illuminate\Http\Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'password' => 'required|string|min:6',
+            'branch_id' => 'nullable|exists:branches,id'
+        ]);
+
+        $user = \App\Models\User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => bcrypt($request->password),
+            'clinic_id' => $request->user()->clinic_id,
+            'branch_id' => $request->branch_id,
+        ]);
+
+        // Assign them the clinic_admin role so they can log in
+        $user->assignRole('clinic_admin');
+
+        return response()->json(['message' => 'Admin successfully created', 'user' => $user], 201);
+    }
+    /**
+     * Get all admins for the currently authenticated clinic.
+     */
+    public function getAdmins(\Illuminate\Http\Request $request)
+    {
+        $clinicId = $request->user()->clinic_id;
+
+        if (!$clinicId) {
+            return response()->json([]);
+        }
+
+        // Fetch users belonging to this clinic who have the 'clinic_admin' role
+        $admins = \App\Models\User::where('clinic_id', $clinicId)
+                    ->role('clinic_admin') // Spatie permissions scope
+                    ->get(['id', 'name', 'email', 'created_at']);
+
+        return response()->json($admins);
+    }
     public function update(Request $request, $id)
     {
         $clinic = Clinic::findOrFail($id);

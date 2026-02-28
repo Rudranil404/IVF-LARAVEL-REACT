@@ -18,6 +18,7 @@ class User extends Authenticatable
         'email',
         'password',
         'clinic_id', // Add this if Clinic Admins belong to a specific clinic
+        'branch_id',
     ];
     protected $guard_name = 'sanctum';
     protected $hidden = [

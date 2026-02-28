@@ -11,11 +11,14 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Create Roles
-        $superAdminRole = Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web']);
-        $clinicAdminRole = Role::firstOrCreate(['name' => 'clinic_admin', 'guard_name' => 'web']);
+        // 1. Clear Spatie cache before seeding to prevent conflicts
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // 2. Create the first Super Admin user
+        // 2. Create Roles and explicitly set the guard to 'sanctum' (NOT 'web')
+        $superAdminRole = Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'sanctum']);
+        $clinicAdminRole = Role::firstOrCreate(['name' => 'clinic_admin', 'guard_name' => 'sanctum']);
+
+        // 3. Create the first Super Admin user
         $superAdmin = User::firstOrCreate(
             ['email' => 'super@admin.com'],
             [
@@ -24,7 +27,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // 3. Assign Role
+        // 4. Assign Role
         $superAdmin->assignRole($superAdminRole);
     }
 }

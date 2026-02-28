@@ -36,19 +36,11 @@ class Clinic extends Model
     ];
 
     /**
-     * Get the parent clinic if this is a branch.
+     * Get the parent clinic if this is a branch (Legacy/Self-referential).
      */
     public function parentClinic()
     {
         return $this->belongsTo(Clinic::class, 'parent_clinic_id');
-    }
-
-    /**
-     * Get all branches belonging to this master clinic.
-     */
-    public function branches()
-    {
-        return $this->hasMany(Clinic::class, 'parent_clinic_id');
     }
 
     /**
@@ -65,5 +57,13 @@ class Clinic extends Model
     public function users()
     {
         return $this->hasMany(User::class);
+    }
+
+    /**
+     * Get all branch locations associated with this clinic.
+     */
+    public function branches()
+    {
+        return $this->hasMany(Branch::class);
     }
 }

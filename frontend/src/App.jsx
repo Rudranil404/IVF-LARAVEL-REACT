@@ -4,10 +4,10 @@ import SuperAdminLogin from './pages/SuperAdminLogin';
 import Dashboard from './pages/Dashboard';
 import ClinicManagement from './pages/ClinicManagement';
 import ClinicDashboard from './pages/ClinicDashboard';
-
-// ⚠️ NEW IMPORTS
 import PatientList from './pages/PatientList';
-import PatientRegistration from './pages/PatientRegistration';
+
+// ⚠️ NEW: Import the Branch Management page
+import BranchManagement from './pages/BranchManagement'; 
 
 function App() {
   return (
@@ -23,13 +23,13 @@ function App() {
         {/* Clinic Admin & Staff Routes */}
         <Route path="/clinic-dashboard" element={<ClinicDashboard />} />
         
-        {/* ⚠️ NEW ROUTES */}
+        // ⚠️ NEW: Branch Route
+        <Route path="/clinic-branches" element={<BranchManagement />} />
+        
         <Route path="/patients" element={<PatientList />} />
-        {/* <Route path="/patients/new" element={<PatientRegistration />} /> */}
-
       </Routes>
     </Router>
   );
 }
 
-export default App; 
+export default App;

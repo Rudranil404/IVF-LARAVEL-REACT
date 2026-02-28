@@ -14,7 +14,11 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/dashboard/stats', [App\Http\Controllers\DashboardController::class, 'stats']);
+    // ... inside Route::middleware('auth:sanctum')->group(function () {
     
+    Route::patch('/branches/{id}/toggle-status', [BranchController::class, 'toggleStatus']);
+    Route::apiResource('branches', BranchController::class);
+    Route::apiResource('patients', PatientController::class);
     // Get current logged-in user safely (handles null clinics for Super Admins)
     Route::get('/user', function (Request $request) {
         $user = $request->user()->load('roles');
